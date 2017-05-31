@@ -2,17 +2,31 @@ extern crate greprs;
 
 use std::env;
 use std::fs::File;
+use std::io::BufReader;
 use std::io::prelude::*;
 
 fn main() {
     let args: Vec<_> = env::args().collect();
-    let cfg = greprs::parse_config(&args);
+    let maybe_cfg = greprs::parse_config(&args);
+    let cfg = match maybe_cfg {
+        Err(greprs::ParseConfigError::NotEnoughArgs) => {
+            println!("USAGE: greprs <pattern> <file-name>");
+            std::process::exit(1)
+        }
+        Ok(cfg) => {
+            cfg
+        }
+    };
+
     println!("Searching a needle '{}' in a haystack '{}'", cfg.needle, cfg.haystack);
-/*    
-    let mut file = File::open(haystack).expect("File not found");
-    let mut contents = String::new();
-    file.read_to_string(&mut contents).expect("Can't read a file");
-    //assert_eq!(contents, "Hello, world!");
-    print!("{}", contents);
-*/
+
+    let file = File::open(cfg.haystack).expect("File not found");
+    let reader = BufReader::new(file);
+    for (i, line) in reader.lines().enumerate() {
+        let l = line.unwrap();
+        if l.contains(&cfg.needle) {
+            println!("{} found @ line {}", l, i + 1);
+        }
+    }
+
 }
