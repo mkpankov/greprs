@@ -1,9 +1,6 @@
 extern crate greprs;
 
 use std::env;
-use std::fs::File;
-use std::io::BufReader;
-use std::io::prelude::*;
 
 fn main() {
     let args: Vec<_> = env::args().collect();
@@ -20,13 +17,5 @@ fn main() {
 
     println!("Searching a needle '{}' in a haystack '{}'", cfg.needle, cfg.haystack);
 
-    let file = File::open(cfg.haystack).expect("File not found");
-    let reader = BufReader::new(file);
-    for (i, line) in reader.lines().enumerate() {
-        let l = line.unwrap();
-        if l.contains(&cfg.needle) {
-            println!("{} found @ line {}", l, i + 1);
-        }
-    }
-
+    greprs::search(&cfg.haystack, &cfg.needle);
 }
