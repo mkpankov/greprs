@@ -1,6 +1,7 @@
 use std::fs::File;
 use std::io::BufReader;
 use std::io::prelude::*;
+use std::io;
 use std::iter::Iterator;
 
 pub struct Config {
@@ -42,13 +43,14 @@ fn search_impl<T>(lines: T, needle: &str) -> Vec<Match>
     matches
 }
 
-pub fn search(haystack: &str, needle: &str) {
-    let file = File::open(haystack).expect("File not found");
+pub fn search(haystack: &str, needle: &str) -> io::Result<()>{
+    let file = File::open(haystack)?;
     let reader = BufReader::new(file);
     let lines = reader.lines().filter_map(|s| s.ok());
     for i in search_impl(lines, needle).iter() {
         println!("{} found @ line {}", needle, i.line);
     }
+    Ok(())
 }
 
 #[test]

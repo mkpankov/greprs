@@ -1,6 +1,7 @@
 extern crate greprs;
 
 use std::env;
+use std::error::Error;
 
 fn main() {
     let args: Vec<_> = env::args().collect();
@@ -17,5 +18,10 @@ fn main() {
 
     println!("Searching a needle '{}' in a haystack '{}'", cfg.needle, cfg.haystack);
 
-    greprs::search(&cfg.haystack, &cfg.needle);
+    match greprs::search(&cfg.haystack, &cfg.needle) {
+        Err(e) => {
+            println!("Error: {}. Cause: {:?}", e.description(), e.cause());
+        }
+        _ => { },
+    }
 }
