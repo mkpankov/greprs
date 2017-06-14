@@ -68,7 +68,7 @@ fn search_return_many_cyr() {
         String::from("баз")
     ];
     let matches = search_impl(lines.into_iter(), "ба");
-    assert_eq!(matches.len(), 2);
+    assert_eq!(matches, [Match{line: 2}, Match{line: 3}]);
 }
 
 #[test]
