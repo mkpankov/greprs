@@ -30,15 +30,21 @@ pub fn parse_config(args: &[String]) -> Result<Config, ParseConfigError> {
 #[derive(Debug, PartialEq, Eq)]
 struct Match {
     line: usize,
+    span: (usize, usize),
 }
 
 fn search_impl<T>(lines: T, needle: &str) -> Vec<Match>
     where T: Iterator<Item = String>
 {
     let mut matches = Vec::new();
-    for (i, line) in lines.enumerate() {
-        if line.contains(&needle) {
-            matches.push(Match { line: i + 1 });
+    for (line_number, line) in lines.enumerate() {
+        let index = line.find(needle);
+        match index {
+            Some(offset) => matches.push(Match {
+                line: line_number + 1, span: (offset, offset + needle.len()) }),
+            None => {
+                continue;
+            }
         }
     }
     matches
@@ -68,7 +74,7 @@ fn search_one_entry() {
     // one entry in input
     let lines = vec![String::from("bla"), String::from("zxc"), String::from("qwe")];
     let matches = search_impl(lines.into_iter(), "zxc");
-    assert_eq!(matches[0], Match { line: 2 });
+    assert_eq!(matches[0], Match { line: 2, span: (0, 3) });
 }
 
 #[test]
@@ -86,8 +92,8 @@ fn search_two_entries() {
         vec![String::from("bla"), String::from("zxc"), String::from("qwe"), String::from("bla")];
     let matches = search_impl(lines.into_iter(), "bla");
     assert_eq!(matches.len(), 2);
-    assert_eq!(matches[0], Match { line: 1 });
-    assert_eq!(matches[1], Match { line: 4 });
+    assert_eq!(matches[0], Match { line: 1, span: (0, 3) });
+    assert_eq!(matches[1], Match { line: 4, span: (0, 3) });
 }
 
 #[test]
@@ -103,5 +109,5 @@ fn search_cyrilic_entry() {
     // one cyrilic entry
     let lines = vec![String::from("йцу"), String::from("фыв"), String::from("ячс")];
     let matches = search_impl(lines.into_iter(), "фыв");
-    assert_eq!(matches[0], Match { line: 2 });
+    assert_eq!(matches[0], Match { line: 2, span: (0, 3) });
 }
