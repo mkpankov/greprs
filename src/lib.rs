@@ -1,8 +1,9 @@
 use std::fs::File;
 use std::io::BufReader;
 use std::io::prelude::*;
-use std::io;
+use std::io::{self, Write};
 use std::iter::Iterator;
+use std::error::Error;
 
 pub struct Config {
     pub needle: String,
@@ -43,14 +44,23 @@ fn search_impl<T>(lines: T, needle: &str) -> Vec<Match>
     matches
 }
 
-pub fn search(haystack: &str, needle: &str) -> io::Result<()>{
-    let file = File::open(haystack)?;
+pub fn search(haystack: &str, needle: &str) {
+    let maybe_file = File::open(haystack);
+    let file;
+    match maybe_file {
+        Err(e) => {
+            writeln!(io::stderr(), "Error: {}.", e.description()).unwrap();
+            std::process::exit(1);
+        }
+        Ok(f) => {
+            file = f;
+        }
+    }
     let reader = BufReader::new(file);
     let lines = reader.lines().filter_map(|s| s.ok());
     for i in search_impl(lines, needle).iter() {
         println!("{} found @ line {}", needle, i.line);
     }
-    Ok(())
 }
 
 #[test]
