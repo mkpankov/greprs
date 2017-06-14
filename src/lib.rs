@@ -64,7 +64,7 @@ fn search_empty_input() {
     // empty input
     let lines = Vec::new();
     let matches = search_impl(lines.into_iter(), "zxc");
-    assert_eq!(matches.is_empty(), true);
+    assert!(matches.is_empty());
 }
 
 #[test]
@@ -83,7 +83,7 @@ fn search_no_entries() {
     // no entries in non-empty input
     let lines = vec![String::from("zxc"), String::from("asd")];
     let matches = search_impl(lines.into_iter(), "bla");
-    assert_eq!(matches.is_empty(), true);
+    assert!(matches.is_empty());
 }
 
 #[test]
