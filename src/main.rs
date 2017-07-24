@@ -11,12 +11,14 @@ fn main() {
             writeln!(io::stderr(), "USAGE: greprs <pattern> <file-name>").unwrap();
             std::process::exit(1)
         }
-        Ok(cfg) => {
-            cfg
-        }
+        Ok(cfg) => cfg,
     };
 
-    println!("Searching a needle '{}' in a haystack '{}'", cfg.needle, cfg.haystack);
+    println!(
+        "Searching a needle '{}' in a haystack '{}'",
+        cfg.needle,
+        cfg.haystack
+    );
 
     greprs::search(&cfg.haystack, &cfg.needle);
 }
