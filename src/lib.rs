@@ -1,4 +1,6 @@
 use std::fs::File;
+use std::fs;
+use std::path::Path;
 use std::io::BufReader;
 use std::io::prelude::*;
 use std::io::{self, Write};
@@ -8,19 +10,32 @@ use std::error::Error;
 pub struct Config {
     pub needle: String,
     pub haystack: String,
+    pub recursive: bool,
 }
 
 pub enum ParseConfigError {
     NotEnoughArgs,
+    UnknownOpt,
 }
 
 pub fn parse_config(args: &[String]) -> Result<Config, ParseConfigError> {
-    if args.len() == 3 {
-        let needle = args[1].clone();
-        let haystack = args[2].clone();
+    let mut opts = 0;
+    let mut recursive = false;
+    if args.len() == 4 {
+        if args[1] == "-r" {
+            recursive = true;
+        } else {
+            return Err(ParseConfigError::UnknownOpt);
+        }
+        opts = 1;
+    }
+    if args.len() - opts == 3 {
+        let needle = args[opts + 1].clone();
+        let haystack = args[opts + 2].clone();
         Ok(Config {
             needle: needle,
             haystack: haystack,
+            recursive: recursive,
         })
     } else {
         Err(ParseConfigError::NotEnoughArgs)
@@ -72,6 +87,92 @@ pub fn search(haystack: &str, needle: &str) {
     let lines = reader.lines().take_while(|x| x.is_ok()).map(|x| x.unwrap());
     for i in search_impl(lines, needle).iter() {
         println!("{} found @ line {}", needle, i.line);
+    }
+}
+
+struct WalkDir {
+    dirs: Vec<String>,
+    walk_dir_it: std::fs::ReadDir,
+}
+
+impl WalkDir {
+    fn get_readdir_iter(p: &str) -> std::fs::ReadDir {
+        let read_dir;
+        let maybe_read_dir = fs::read_dir(p);
+        match maybe_read_dir {
+            Err(e) => {
+                writeln!(io::stderr(), "Error: {}.", e.description()).unwrap();
+                std::process::exit(1);
+            }
+            Ok(d) => {
+                read_dir = d;
+            }
+        }
+        read_dir
+    }
+
+    fn new(p: &str) -> WalkDir {
+        WalkDir {
+            dirs: Vec::new(),
+            walk_dir_it: WalkDir::get_readdir_iter(p),
+        }
+    }
+}
+
+impl Iterator for WalkDir {
+    type Item = String;
+
+    fn next(&mut self) -> Option<String> {
+        let maybe_entry;
+        let maybe_entry_it = self.walk_dir_it.next();
+        match maybe_entry_it {
+            Some(e) => {
+                maybe_entry = e;
+            }
+            None => {
+                let next_maybe_entry = self.dirs.pop();
+                match next_maybe_entry {
+                    Some(e) => {
+                        self.walk_dir_it = WalkDir::get_readdir_iter(&e);
+                        return self.next();
+                    }
+                    None => {
+                        return None;
+                    }
+                }
+            }
+        }
+        let entry_path;
+        match maybe_entry {
+            Err(e) => {
+                writeln!(io::stderr(), "Error: {}.", e.description()).unwrap();
+                std::process::exit(1);
+            }
+            Ok(e) => {
+                entry_path = e.path();
+            }
+        }
+        if entry_path.to_str() == None {
+            return None;
+        }
+        if entry_path.is_dir() {
+            self.dirs.push(String::from(entry_path.to_str().unwrap()));
+            self.next()
+        } else {
+            Some(String::from(entry_path.to_str().unwrap()))
+        }
+    }
+}
+
+pub fn search_recursive(haystack: &str, needle: &str) {
+    if Path::new(haystack).is_file() {
+        search(haystack, needle);
+    } else {
+        let walk = WalkDir::new(&haystack);
+        for entry in walk {
+            println!("File {}:", entry);
+            search(&entry, needle);
+        }
     }
 }
 
@@ -159,4 +260,16 @@ fn search_cyrilic_entry() {
             span: (0, 3),
         }
     );
+}
+
+#[test]
+fn recursive_walk() {
+    // TODO: find better way to choose test data path
+    let test_data_path = String::from(std::env::current_dir().unwrap().to_str().unwrap());
+    let files: Vec<_> = WalkDir::new(&test_data_path).collect();
+    let matches: Vec<_> = files
+        .into_iter()
+        .filter(|x| x.find("haystack.txt").is_some())
+        .collect();
+    assert_eq!(matches.len(), 3);
 }
