@@ -68,7 +68,7 @@ pub fn search(haystack: &str, needle: &str) {
         }
     }
     let reader = BufReader::new(file);
-    let lines = reader.lines().filter_map(|s| s.ok());
+    let lines = reader.lines().take_while(|x| x.is_ok()).map(|x| x.unwrap());
     for i in search_impl(lines, needle).iter() {
         println!("{} found @ line {}", needle, i.line);
     }
