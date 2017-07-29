@@ -1,6 +1,6 @@
 use std::fs::File;
 use std::fs;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::io::BufReader;
 use std::io::prelude::*;
 use std::io::{self, Write};
@@ -91,75 +91,53 @@ pub fn search(haystack: &str, needle: &str) {
 }
 
 struct WalkDir {
-    dirs: Vec<String>,
+    dirs: Vec<PathBuf>,
     walk_dir_it: std::fs::ReadDir,
 }
 
 impl WalkDir {
-    fn get_readdir_iter(p: &str) -> std::fs::ReadDir {
-        let read_dir;
-        let maybe_read_dir = fs::read_dir(p);
-        match maybe_read_dir {
-            Err(e) => {
-                writeln!(io::stderr(), "Error: {}.", e.description()).unwrap();
-                std::process::exit(1);
-            }
-            Ok(d) => {
-                read_dir = d;
-            }
-        }
-        read_dir
-    }
-
-    fn new(p: &str) -> WalkDir {
-        WalkDir {
+    fn new<P: AsRef<Path>>(path: P) -> io::Result<WalkDir> {
+        let dir = fs::read_dir(path)?;
+        Ok(WalkDir {
             dirs: Vec::new(),
-            walk_dir_it: WalkDir::get_readdir_iter(p),
-        }
+            walk_dir_it: dir,
+        })
     }
 }
 
 impl Iterator for WalkDir {
-    type Item = String;
+    type Item = io::Result<PathBuf>;
 
-    fn next(&mut self) -> Option<String> {
-        let maybe_entry;
-        let maybe_entry_it = self.walk_dir_it.next();
-        match maybe_entry_it {
-            Some(e) => {
-                maybe_entry = e;
-            }
-            None => {
-                let next_maybe_entry = self.dirs.pop();
-                match next_maybe_entry {
-                    Some(e) => {
-                        self.walk_dir_it = WalkDir::get_readdir_iter(&e);
-                        return self.next();
-                    }
-                    None => {
-                        return None;
+    fn next(&mut self) -> Option<Self::Item> {
+        match self.walk_dir_it.next() {
+            Some(maybe_entry) => {
+                match maybe_entry {
+                    Err(entry) => Some(Err(entry)),
+                    Ok(entry) => {
+                        let path = entry.path();
+                        if path.is_dir() {
+                            self.dirs.push(path);
+                            self.next()
+                        } else {
+                            Some(Ok(path))
+                        }
                     }
                 }
             }
-        }
-        let entry_path;
-        match maybe_entry {
-            Err(e) => {
-                writeln!(io::stderr(), "Error: {}.", e.description()).unwrap();
-                std::process::exit(1);
+            None => {
+                match self.dirs.pop() {
+                    Some(e) => {
+                        match fs::read_dir(&e.as_path()) {
+                            Err(p) => Some(Err(p)),
+                            Ok(p) => {
+                                self.walk_dir_it = p;
+                                self.next()
+                            }
+                        }
+                    }
+                    None => None,
+                }
             }
-            Ok(e) => {
-                entry_path = e.path();
-            }
-        }
-        if entry_path.to_str() == None {
-            return None;
-        }
-        if entry_path.is_dir() {
-            self.dirs.push(String::from(entry_path.to_str().unwrap()));
-            self.next()
-        } else {
-            Some(String::from(entry_path.to_str().unwrap()))
         }
     }
 }
@@ -168,10 +146,24 @@ pub fn search_recursive(haystack: &str, needle: &str) {
     if Path::new(haystack).is_file() {
         search(haystack, needle);
     } else {
-        let walk = WalkDir::new(&haystack);
-        for entry in walk {
-            println!("File {}:", entry);
-            search(&entry, needle);
+        match WalkDir::new(&haystack) {
+            Err(e) => {
+                writeln!(io::stderr(), "Error: {}.", e.description()).unwrap();
+                std::process::exit(1);
+            }
+            Ok(walkdir) => {
+                for entry in walkdir {
+                    match entry {
+                        Err(e) => {
+                            writeln!(io::stderr(), "Error: {}.", e.description()).unwrap();
+                        }
+                        Ok(e) => {
+                            writeln!(io::stderr(), "File: {}", e.to_str().unwrap()).unwrap();
+                            search(e.to_str().unwrap(), needle);
+                        }
+                    }
+                }
+            }
         }
     }
 }
@@ -265,11 +257,19 @@ fn search_cyrilic_entry() {
 #[test]
 fn recursive_walk() {
     // TODO: find better way to choose test data path
-    let test_data_path = String::from(std::env::current_dir().unwrap().to_str().unwrap());
-    let files: Vec<_> = WalkDir::new(&test_data_path).collect();
+    let test_data_path = std::env::current_dir().unwrap();
+    let files: Vec<_> = WalkDir::new(&test_data_path).unwrap().collect();
     let matches: Vec<_> = files
         .into_iter()
-        .filter(|x| x.find("haystack.txt").is_some())
+        .filter(|x| {
+            x.as_ref()
+                .unwrap()
+                .as_path()
+                .to_str()
+                .unwrap()
+                .find("haystack.txt")
+                .is_some()
+        })
         .collect();
     assert_eq!(matches.len(), 3);
 }

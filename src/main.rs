@@ -23,6 +23,7 @@ fn main() {
             std::process::exit(1);
         }
         Err(greprs::ParseConfigError::NotEnoughArgs) => {
+            writeln!(io::stderr(), "Not enough arguments").unwrap();
             usage();
             std::process::exit(1);
         }
