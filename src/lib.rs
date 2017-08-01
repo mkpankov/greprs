@@ -256,8 +256,16 @@ fn search_cyrilic_entry() {
 
 #[test]
 fn recursive_walk() {
-    // TODO: find better way to choose test data path
-    let test_data_path = std::env::current_dir().unwrap();
+    let program_path = std::env::current_exe().unwrap();
+    let test_data_path = program_path
+        .parent()
+        .unwrap()
+        .parent()
+        .unwrap()
+        .parent()
+        .unwrap()
+        .parent()
+        .unwrap();
     let files: Vec<_> = WalkDir::new(&test_data_path).unwrap().collect();
     let matches: Vec<_> = files
         .into_iter()
