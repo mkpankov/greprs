@@ -148,7 +148,8 @@ fn search_cyrilic_entry() {
         matches[0],
         Match {
             line: 2,
-            span: (0, 3),
+            // Issue #3
+            span: (0, 6),
         }
     );
 }
