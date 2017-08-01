@@ -48,18 +48,32 @@ struct Match {
     span: (usize, usize),
 }
 
+#[derive(Debug, PartialEq, Eq)]
+struct LineMatch {
+    span: (usize, usize),
+}
+
+fn search_line_impl(haystack: &str, needle: &str) -> Option<LineMatch> {
+    let maybe_start = haystack.find(needle);
+    match maybe_start {
+        Some(start) => Some(LineMatch { span: (start, start + needle.len()) }),
+        None => None,
+    }
+
+}
+
 fn search_impl<T>(lines: T, needle: &str) -> Vec<Match>
 where
     T: Iterator<Item = String>,
 {
     let mut matches = Vec::new();
     for (line_number, line) in lines.enumerate() {
-        let index = line.find(needle);
-        match index {
-            Some(offset) => {
+        let maybe_line_match = search_line_impl(&line, needle);
+        match maybe_line_match {
+            Some(LineMatch { span }) => {
                 matches.push(Match {
                     line: line_number + 1,
-                    span: (offset, offset + needle.len()),
+                    span: span,
                 })
             }
             None => {
