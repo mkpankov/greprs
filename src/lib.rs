@@ -61,6 +61,7 @@ pub fn search(haystack: &str, needle: &str) {
     match maybe_file {
         Err(e) => {
             writeln!(io::stderr(), "Error: {}.", e.description()).unwrap();
+            // XXX: This exit breaks tests
             std::process::exit(1);
         }
         Ok(f) => {
@@ -72,6 +73,13 @@ pub fn search(haystack: &str, needle: &str) {
     for i in search_impl(lines, needle).iter() {
         println!("{} found @ line {}", needle, i.line);
     }
+}
+
+#[test]
+fn search_directory_nonrecursively() {
+    let cur_dir = std::env::current_dir().unwrap();
+    // XXX: This test is bad, it only makes sure we don't loop indefinitely
+    search(cur_dir.to_str().unwrap(), "foo");
 }
 
 #[test]
