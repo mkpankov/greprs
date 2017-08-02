@@ -1,4 +1,6 @@
 use std::fs::File;
+use std::fs;
+use std::path::{Path, PathBuf};
 use std::io::BufReader;
 use std::io::prelude::*;
 use std::io::{self, Write};
@@ -8,19 +10,32 @@ use std::error::Error;
 pub struct Config {
     pub needle: String,
     pub haystack: String,
+    pub recursive: bool,
 }
 
 pub enum ParseConfigError {
     NotEnoughArgs,
+    UnknownOpt,
 }
 
 pub fn parse_config(args: &[String]) -> Result<Config, ParseConfigError> {
-    if args.len() == 3 {
-        let needle = args[1].clone();
-        let haystack = args[2].clone();
+    let mut opts = 0;
+    let mut recursive = false;
+    if args.len() == 4 {
+        if args[1] == "-r" {
+            recursive = true;
+        } else {
+            return Err(ParseConfigError::UnknownOpt);
+        }
+        opts = 1;
+    }
+    if args.len() - opts == 3 {
+        let needle = args[opts + 1].clone();
+        let haystack = args[opts + 2].clone();
         Ok(Config {
             needle: needle,
             haystack: haystack,
+            recursive: recursive,
         })
     } else {
         Err(ParseConfigError::NotEnoughArgs)
@@ -72,6 +87,84 @@ pub fn search(haystack: &str, needle: &str) {
     let lines = reader.lines().take_while(|x| x.is_ok()).map(|x| x.unwrap());
     for i in search_impl(lines, needle).iter() {
         println!("{} found @ line {}", needle, i.line);
+    }
+}
+
+struct WalkDir {
+    dirs: Vec<PathBuf>,
+    walk_dir_it: std::fs::ReadDir,
+}
+
+impl WalkDir {
+    fn new<P: AsRef<Path>>(path: P) -> io::Result<WalkDir> {
+        let dir = fs::read_dir(path)?;
+        Ok(WalkDir {
+            dirs: Vec::new(),
+            walk_dir_it: dir,
+        })
+    }
+}
+
+impl Iterator for WalkDir {
+    type Item = io::Result<PathBuf>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        match self.walk_dir_it.next() {
+            Some(maybe_entry) => {
+                match maybe_entry {
+                    Err(entry) => Some(Err(entry)),
+                    Ok(entry) => {
+                        let path = entry.path();
+                        if path.is_dir() {
+                            self.dirs.push(path);
+                            self.next()
+                        } else {
+                            Some(Ok(path))
+                        }
+                    }
+                }
+            }
+            None => {
+                match self.dirs.pop() {
+                    Some(e) => {
+                        match fs::read_dir(&e.as_path()) {
+                            Err(p) => Some(Err(p)),
+                            Ok(p) => {
+                                self.walk_dir_it = p;
+                                self.next()
+                            }
+                        }
+                    }
+                    None => None,
+                }
+            }
+        }
+    }
+}
+
+pub fn search_recursive(haystack: &str, needle: &str) {
+    if Path::new(haystack).is_file() {
+        search(haystack, needle);
+    } else {
+        match WalkDir::new(&haystack) {
+            Err(e) => {
+                writeln!(io::stderr(), "Error: {}.", e.description()).unwrap();
+                std::process::exit(1);
+            }
+            Ok(walkdir) => {
+                for entry in walkdir {
+                    match entry {
+                        Err(e) => {
+                            writeln!(io::stderr(), "Error: {}.", e.description()).unwrap();
+                        }
+                        Ok(e) => {
+                            writeln!(io::stderr(), "File: {}", e.to_str().unwrap()).unwrap();
+                            search(e.to_str().unwrap(), needle);
+                        }
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -160,4 +253,32 @@ fn search_cyrilic_entry() {
             span: (0, 6),
         }
     );
+}
+
+#[test]
+fn recursive_walk() {
+    let program_path = std::env::current_exe().unwrap();
+    let test_data_path = program_path
+        .parent()
+        .unwrap()
+        .parent()
+        .unwrap()
+        .parent()
+        .unwrap()
+        .parent()
+        .unwrap();
+    let files: Vec<_> = WalkDir::new(&test_data_path).unwrap().collect();
+    let matches: Vec<_> = files
+        .into_iter()
+        .filter(|x| {
+            x.as_ref()
+                .unwrap()
+                .as_path()
+                .to_str()
+                .unwrap()
+                .find("haystack.txt")
+                .is_some()
+        })
+        .collect();
+    assert_eq!(matches.len(), 3);
 }
