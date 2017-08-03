@@ -45,21 +45,58 @@ pub fn parse_config(args: &[String]) -> Result<Config, ParseConfigError> {
 #[derive(Debug, PartialEq, Eq)]
 struct Match {
     line: usize,
-    span: (usize, usize),
+    line_match: LineMatch,
 }
 
 #[derive(Debug, PartialEq, Eq)]
 struct LineMatch {
-    span: (usize, usize),
+    span_bytes: (usize, usize),
+    span_chars: (usize, usize),
+}
+
+fn determine_needle_char_bounds(
+    haystack: &str,
+    needle_byte_bounds: (usize, usize),
+) -> (usize, usize) {
+    let (needle_start, needle_end) = needle_byte_bounds;
+    let mut needle_start_char_index = None;
+    let mut needle_end_char_index = None;
+    let mut char_index = 0;
+    for (byte_index, _) in haystack.char_indices() {
+        if byte_index == needle_start {
+            needle_start_char_index = Some(char_index);
+        }
+        if byte_index == needle_end {
+            needle_end_char_index = Some(char_index);
+        }
+        char_index += 1;
+    }
+
+    if needle_end_char_index.is_none() {
+        needle_end_char_index = Some(char_index);
+    }
+
+    (
+        needle_start_char_index.unwrap(),
+        needle_end_char_index.unwrap(),
+    )
 }
 
 fn search_line_impl(haystack: &str, needle: &str) -> Option<LineMatch> {
-    let maybe_start = haystack.find(needle);
-    match maybe_start {
-        Some(start) => Some(LineMatch { span: (start, start + needle.len()) }),
-        None => None,
-    }
+    let maybe_needle_start = haystack.find(needle);
 
+    let needle_start = match maybe_needle_start {
+        Some(o) => o,
+        None => return None,
+    };
+    let needle_end = needle_start + needle.len();
+
+    let needle_char_bounds = determine_needle_char_bounds(haystack, (needle_start, needle_end));
+
+    Some(LineMatch {
+        span_bytes: (needle_start, needle_end),
+        span_chars: needle_char_bounds,
+    })
 }
 
 fn search_impl<T>(lines: T, needle: &str) -> Vec<Match>
@@ -70,10 +107,10 @@ where
     for (line_number, line) in lines.enumerate() {
         let maybe_line_match = search_line_impl(&line, needle);
         match maybe_line_match {
-            Some(LineMatch { span }) => {
+            Some(line_match) => {
                 matches.push(Match {
                     line: line_number + 1,
-                    span: span,
+                    line_match: line_match,
                 })
             }
             None => {
@@ -202,7 +239,10 @@ fn search_one_entry() {
         matches[0],
         Match {
             line: 2,
-            span: (0, 3),
+            line_match: LineMatch {
+                span_bytes: (0, 3),
+                span_chars: (0, 3),
+            },
         }
     );
 }
@@ -230,14 +270,20 @@ fn search_two_entries() {
         matches[0],
         Match {
             line: 1,
-            span: (0, 3),
+            line_match: LineMatch {
+                span_bytes: (0, 3),
+                span_chars: (0, 3),
+            },
         }
     );
     assert_eq!(
         matches[1],
         Match {
             line: 4,
-            span: (0, 3),
+            line_match: LineMatch {
+                span_bytes: (0, 3),
+                span_chars: (0, 3),
+            },
         }
     );
 }
@@ -263,8 +309,10 @@ fn search_cyrilic_entry() {
         matches[0],
         Match {
             line: 2,
-            // Issue #3
-            span: (0, 6),
+            line_match: LineMatch {
+                span_bytes: (0, 6),
+                span_chars: (0, 3),
+            },
         }
     );
 }
