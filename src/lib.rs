@@ -7,41 +7,6 @@ use std::io::{self, Write};
 use std::iter::Iterator;
 use std::error::Error;
 
-pub struct Config {
-    pub needle: String,
-    pub haystack: String,
-    pub recursive: bool,
-}
-
-pub enum ParseConfigError {
-    NotEnoughArgs,
-    UnknownOpt,
-}
-
-pub fn parse_config(args: &[String]) -> Result<Config, ParseConfigError> {
-    let mut opts = 0;
-    let mut recursive = false;
-    if args.len() == 4 {
-        if args[1] == "-r" {
-            recursive = true;
-        } else {
-            return Err(ParseConfigError::UnknownOpt);
-        }
-        opts = 1;
-    }
-    if args.len() - opts == 3 {
-        let needle = args[opts + 1].clone();
-        let haystack = args[opts + 2].clone();
-        Ok(Config {
-            needle: needle,
-            haystack: haystack,
-            recursive: recursive,
-        })
-    } else {
-        Err(ParseConfigError::NotEnoughArgs)
-    }
-}
-
 #[derive(Debug, PartialEq, Eq)]
 struct Match {
     line: usize,
