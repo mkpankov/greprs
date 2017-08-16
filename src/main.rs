@@ -1,48 +1,43 @@
 extern crate greprs;
+extern crate clap;
 
-use std::env;
-use std::io::{self, Write};
-
-fn usage() {
-    writeln!(
-        io::stderr(),
-        "USAGE: greprs [OPTIONS] <pattern> <file-name>"
-    ).unwrap();
-    writeln!(io::stderr(), "OPTIONS:").unwrap();
-    writeln!(io::stderr(), "\t-r\trecursive").unwrap();
-}
+use clap::{Arg, App};
 
 fn main() {
-    let args: Vec<_> = env::args().collect();
-    let maybe_cfg = greprs::parse_config(&args);
-    let cfg = match maybe_cfg {
-        Err(greprs::ParseConfigError::UnknownOpt) => {
-            // TODO: print value of unknown option
-            writeln!(io::stderr(), "Unknown option").unwrap();
-            usage();
-            std::process::exit(1);
-        }
-        Err(greprs::ParseConfigError::NotEnoughArgs) => {
-            writeln!(io::stderr(), "Not enough arguments").unwrap();
-            usage();
-            std::process::exit(1);
-        }
-        Ok(cfg) => cfg,
-    };
+    let matches = App::new("greprs")
+        .about("grep implementation")
+        .version("0.1.0")
+        .arg(
+            Arg::with_name("pattern")
+                .help("pattern for search")
+                .required(true)
+                .index(1),
+        )
+        .arg(
+            Arg::with_name("file-name")
+                .help("file or directiry for search")
+                .required(true)
+                .index(2),
+        )
+        .arg(Arg::with_name("r").short("r").help("recursive search"))
+        .get_matches();
 
-    if !cfg.recursive {
+    let needle = matches.value_of("pattern").unwrap();
+    let haystack = matches.value_of("file-name").unwrap();
+
+    if !matches.is_present("r") {
         println!(
             "Searching a needle '{}' in a haystack '{}'",
-            cfg.needle,
-            cfg.haystack
+            needle,
+            haystack
         );
-        greprs::search(&cfg.haystack, &cfg.needle);
+        greprs::search(&haystack, &needle);
     } else {
         println!(
             "Searching recursive a needle '{}' in a haystack '{}'",
-            cfg.needle,
-            cfg.haystack
+            needle,
+            haystack
         );
-        greprs::search_recursive(&cfg.haystack, &cfg.needle);
+        greprs::search_recursive(&haystack, &needle);
     }
 }
