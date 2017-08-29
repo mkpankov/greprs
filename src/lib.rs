@@ -1,3 +1,5 @@
+extern crate term;
+
 use std::fs::File;
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -86,6 +88,21 @@ where
     matches
 }
 
+fn println_highlight(line: &String, span_chars: (usize, usize)) {
+    let mut l0 = line.clone();
+    let (b0, b1) = span_chars;
+    let mut l1 = l0.split_off(b0);
+    let l2 = l1.split_off(b1 - b0);
+
+    let mut t = term::stdout().unwrap();
+    t.reset().unwrap();
+    write!(t, "{}", l0).unwrap();
+    t.fg(term::color::BRIGHT_RED).unwrap();
+    write!(t, "{}", l1).unwrap();
+    t.reset().unwrap();
+    writeln!(t, "{}", l2).unwrap();
+}
+
 pub fn search(haystack: &str, needle: &str) {
     let maybe_file = File::open(haystack);
     let file;
@@ -100,9 +117,14 @@ pub fn search(haystack: &str, needle: &str) {
         }
     }
     let reader = BufReader::new(file);
-    let lines = reader.lines().take_while(|x| x.is_ok()).map(|x| x.unwrap());
-    for i in search_impl(lines, needle).iter() {
-        println!("{} found @ line {}", needle, i.line);
+    let lines: Vec<String> = reader
+        .lines()
+        .take_while(|x| x.is_ok())
+        .map(|x| x.unwrap())
+        .collect();
+    let matches = search_impl(lines.iter().cloned(), &needle);
+    for i in matches.iter() {
+        println_highlight(lines.get(i.line - 1).unwrap(), i.line_match.span_bytes);
     }
 }
 

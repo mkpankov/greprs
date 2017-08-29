@@ -3,3 +3,4 @@ world
 bla-blah-bla
 foo
 bar
+проверка цвета подсветки
