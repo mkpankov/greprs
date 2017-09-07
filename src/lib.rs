@@ -76,7 +76,7 @@ where
         match maybe_line_match {
             Some(line_match) => {
                 matches.push(Match {
-                    line: line_number + 1,
+                    line: line_number,
                     line_match: line_match,
                 })
             }
@@ -88,19 +88,19 @@ where
     matches
 }
 
-fn println_highlight(line: &String, span_chars: (usize, usize)) {
-    let mut l0 = line.clone();
-    let (b0, b1) = span_chars;
-    let mut l1 = l0.split_off(b0);
-    let l2 = l1.split_off(b1 - b0);
+fn println_highlight(line: &str, span_bytes: (usize, usize)) {
+    let (match_start, match_end) = span_bytes;
+    let line_before_match = &line[..match_start];
+    let line_match = &line[match_start..match_end];
+    let line_after_match = &line[match_end..];
 
     let mut t = term::stdout().unwrap();
     t.reset().unwrap();
-    write!(t, "{}", l0).unwrap();
+    write!(t, "{}", line_before_match).unwrap();
     t.fg(term::color::BRIGHT_RED).unwrap();
-    write!(t, "{}", l1).unwrap();
+    write!(t, "{}", line_match).unwrap();
     t.reset().unwrap();
-    writeln!(t, "{}", l2).unwrap();
+    writeln!(t, "{}", line_after_match).unwrap();
 }
 
 pub fn search(haystack: &str, needle: &str) {
@@ -124,7 +124,7 @@ pub fn search(haystack: &str, needle: &str) {
         .collect();
     let matches = search_impl(lines.iter().cloned(), &needle);
     for i in matches.iter() {
-        println_highlight(lines.get(i.line - 1).unwrap(), i.line_match.span_bytes);
+        println_highlight(lines.get(i.line).unwrap(), i.line_match.span_bytes);
     }
 }
 
@@ -225,7 +225,7 @@ fn search_one_entry() {
     assert_eq!(
         matches[0],
         Match {
-            line: 2,
+            line: 1,
             line_match: LineMatch {
                 span_bytes: (0, 3),
                 span_chars: (0, 3),
@@ -256,7 +256,7 @@ fn search_two_entries() {
     assert_eq!(
         matches[0],
         Match {
-            line: 1,
+            line: 0,
             line_match: LineMatch {
                 span_bytes: (0, 3),
                 span_chars: (0, 3),
@@ -266,7 +266,7 @@ fn search_two_entries() {
     assert_eq!(
         matches[1],
         Match {
-            line: 4,
+            line: 3,
             line_match: LineMatch {
                 span_bytes: (0, 3),
                 span_chars: (0, 3),
@@ -295,7 +295,7 @@ fn search_cyrilic_entry() {
     assert_eq!(
         matches[0],
         Match {
-            line: 2,
+            line: 1,
             line_match: LineMatch {
                 span_bytes: (0, 6),
                 span_chars: (0, 3),
