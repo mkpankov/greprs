@@ -1,3 +1,5 @@
+extern crate term;
+
 use std::fs::File;
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -74,7 +76,7 @@ where
         match maybe_line_match {
             Some(line_match) => {
                 matches.push(Match {
-                    line: line_number + 1,
+                    line: line_number,
                     line_match: line_match,
                 })
             }
@@ -84,6 +86,21 @@ where
         }
     }
     matches
+}
+
+fn println_highlight(line: &str, span_bytes: (usize, usize)) {
+    let (match_start, match_end) = span_bytes;
+    let line_before_match = &line[..match_start];
+    let line_match = &line[match_start..match_end];
+    let line_after_match = &line[match_end..];
+
+    let mut t = term::stdout().unwrap();
+    t.reset().unwrap();
+    write!(t, "{}", line_before_match).unwrap();
+    t.fg(term::color::BRIGHT_RED).unwrap();
+    write!(t, "{}", line_match).unwrap();
+    t.reset().unwrap();
+    writeln!(t, "{}", line_after_match).unwrap();
 }
 
 pub fn search(haystack: &str, needle: &str) {
@@ -100,9 +117,14 @@ pub fn search(haystack: &str, needle: &str) {
         }
     }
     let reader = BufReader::new(file);
-    let lines = reader.lines().take_while(|x| x.is_ok()).map(|x| x.unwrap());
-    for i in search_impl(lines, needle).iter() {
-        println!("{} found @ line {}", needle, i.line);
+    let lines: Vec<String> = reader
+        .lines()
+        .take_while(|x| x.is_ok())
+        .map(|x| x.unwrap())
+        .collect();
+    let matches = search_impl(lines.iter().cloned(), &needle);
+    for i in matches.iter() {
+        println_highlight(lines.get(i.line).unwrap(), i.line_match.span_bytes);
     }
 }
 
@@ -203,7 +225,7 @@ fn search_one_entry() {
     assert_eq!(
         matches[0],
         Match {
-            line: 2,
+            line: 1,
             line_match: LineMatch {
                 span_bytes: (0, 3),
                 span_chars: (0, 3),
@@ -234,7 +256,7 @@ fn search_two_entries() {
     assert_eq!(
         matches[0],
         Match {
-            line: 1,
+            line: 0,
             line_match: LineMatch {
                 span_bytes: (0, 3),
                 span_chars: (0, 3),
@@ -244,7 +266,7 @@ fn search_two_entries() {
     assert_eq!(
         matches[1],
         Match {
-            line: 4,
+            line: 3,
             line_match: LineMatch {
                 span_bytes: (0, 3),
                 span_chars: (0, 3),
@@ -273,7 +295,7 @@ fn search_cyrilic_entry() {
     assert_eq!(
         matches[0],
         Match {
-            line: 2,
+            line: 1,
             line_match: LineMatch {
                 span_bytes: (0, 6),
                 span_chars: (0, 3),

@@ -5,3 +5,4 @@ authors = ["Michael Pankov <work@michaelpankov.com>"]
 
 [dependencies]
 clap = "2"
+term = "0.4.6"
